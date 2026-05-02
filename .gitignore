@@ -30,3 +30,4 @@ Trash/
 *.njsproj
 *.sln
 *.sw?
+.env
