@@ -1,25 +1,46 @@
-// File-based storage via local Express API server
-// All data persists as JSON files in the ./data/ folder
+// API client layer — all calls include the Supabase JWT in Authorization header.
+// The token is read from the active Supabase session on each request.
+
+import { supabase } from './supabase';
 
 const API = '/api';
 
+async function getAuthHeader() {
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error('Not authenticated');
+  return { Authorization: `Bearer ${token}` };
+}
+
 async function apiFetch(url, options = {}) {
+  const authHeader = await getAuthHeader();
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+      ...(options.headers || {}),
+    },
     ...options,
   });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const err = new Error(body.message || body.error || `API error: ${res.status}`);
+    err.status = res.status;
+    err.body = body;
+    throw err;
+  }
   return res.json();
 }
 
 // ---- Invoice Number Settings ----
 const DEFAULT_INV_SETTINGS = {
-  format: 'branded',      // 'branded' | 'sequential' | 'random'
-  brandPrefix: '',         // e.g. 'ACME' — empty means use type prefix (INV/EST/CN/BOS)
-  separator: '/',          // '/' | '-' | '#'
-  showFinYear: true,       // include 2026-27 financial year
-  startNumber: 1,          // starting counter value
-  padDigits: 4,            // zero-pad to this many digits
+  format: 'branded',
+  brandPrefix: '',
+  separator: '/',
+  showFinYear: true,
+  startNumber: 1,
+  padDigits: 4,
 };
 
 export const getInvoiceNumberSettings = async () => {
@@ -34,7 +55,7 @@ export const saveInvoiceNumberSettings = async (settings) => {
   });
 };
 
-// ---- Invoice Display Options (checkboxes like showGST, showLogo etc.) ----
+// ---- Invoice Display Options ----
 export const getInvoiceDisplayOptions = async () => {
   const { value } = await apiFetch(`${API}/meta/invoiceDisplayOptions`);
   return value || null;
@@ -47,9 +68,7 @@ export const saveInvoiceDisplayOptions = async (options) => {
   });
 };
 
-// ---- Region preference: 'india' | 'international' | 'both' (default 'both') ----
-// Drives which countries appear in pickers and whether GST-only flows show up in the UI.
-// Stored in localStorage for instant boot — server copy is async-best-effort.
+// ---- Region preference ----
 const REGION_KEY = 'gst_regionMode';
 export const getRegionMode = () => {
   try { return localStorage.getItem(REGION_KEY) || 'both'; } catch { return 'both'; }
@@ -61,8 +80,6 @@ export const setRegionMode = (mode) => {
 };
 
 // ---- Enabled feature modules ----
-// Map of moduleId → bool. Missing keys fall back to the module's default.
-// Stored locally for instant boot; mirrored to server for backup/import.
 const MODULES_KEY = 'gst_enabledModules';
 export const getEnabledModules = () => {
   try {
@@ -76,8 +93,6 @@ export const setEnabledModules = (map) => {
 };
 
 // ---- Invoice counter ----
-// Uses the atomic /meta/:key/increment endpoint so two concurrent saves can't both
-// read 5 and both write 6 (= duplicate invoice numbers, which is a GST audit failure).
 export const getNextInvoiceNumber = async (prefix = 'INV') => {
   const settings = await getInvoiceNumberSettings();
   const key = `counter_${prefix}`;
@@ -103,8 +118,11 @@ export const getNextInvoiceNumber = async (prefix = 'INV') => {
 };
 
 // ---- Bills ----
-export const saveBill = async (bill) => {
-  return apiFetch(`${API}/bills`, { method: 'POST', body: JSON.stringify(bill) });
+export const saveBill = async (bill, isUpdate = false) => {
+  return apiFetch(`${API}/bills`, {
+    method: 'POST',
+    body: JSON.stringify({ ...bill, _isUpdate: isUpdate }),
+  });
 };
 
 export const getAllBills = async () => {
@@ -184,7 +202,7 @@ export const deleteExpense = async (id) => {
   return apiFetch(`${API}/expenses/${encodeURIComponent(id)}`, { method: 'DELETE' });
 };
 
-// ---- Purchases (Purchase Bills for ITC) ----
+// ---- Purchases ----
 export const getAllPurchases = async () => {
   return apiFetch(`${API}/purchases`);
 };
@@ -244,16 +262,32 @@ export const deleteBusinessProfile = async (id) => {
   return apiFetch(`${API}/profiles/${encodeURIComponent(id)}`, { method: 'DELETE' });
 };
 
+// ---- Usage / Plan ----
+export const getUsage = async () => {
+  return apiFetch(`${API}/usage`);
+};
+
+// ---- GST Credentials (Pro only) ----
+export const getGstCredentials = async () => {
+  return apiFetch(`${API}/gst-credentials`);
+};
+
+export const saveGstCredentials = async (creds) => {
+  return apiFetch(`${API}/gst-credentials`, { method: 'POST', body: JSON.stringify(creds) });
+};
+
+export const deleteGstCredentials = async () => {
+  return apiFetch(`${API}/gst-credentials`, { method: 'DELETE' });
+};
+
 // ---- Export / Import ----
-// localStorage keys that are part of the "user's data" and should ride along in any
-// backup. Each key is documented with what it stores and whether losing it matters.
 const EXPORTABLE_LOCALSTORAGE_KEYS = [
-  'gst_customUnits',          // user-defined units (e.g. Carat, Bundle) for line items
-  'gst_regionMode',            // 'india' | 'international' | 'both'
-  'gst_enabledModules',        // map of disabled feature toggles
-  'freegstbill_invoiceOptions',// per-invoice display preference defaults
-  'theme',                     // light/dark
-  'freegstbill_onboarded',     // skip welcome wizard on next launch
+  'gst_customUnits',
+  'gst_regionMode',
+  'gst_enabledModules',
+  'freegstbill_invoiceOptions',
+  'theme',
+  'freegstbill_onboarded',
 ];
 
 const collectLocalStorage = () => {
@@ -267,21 +301,16 @@ const collectLocalStorage = () => {
 const restoreLocalStorage = (map) => {
   if (!map || typeof map !== 'object') return;
   Object.entries(map).forEach(([k, v]) => {
-    if (!EXPORTABLE_LOCALSTORAGE_KEYS.includes(k)) return; // ignore foreign keys
+    if (!EXPORTABLE_LOCALSTORAGE_KEYS.includes(k)) return;
     try { localStorage.setItem(k, v); } catch { /* ignore */ }
   });
 };
 
-// Full export. Returns the JSON-serialised bundle (server data + localStorage).
-// Pass `selection` to limit what's included — undefined ⇒ everything.
-//
-// `selection` shape: { profile, profiles, bills, clients, products, expenses,
-//   purchases, recurring, receipts, termsTemplates, meta, localStorage } — each bool.
 export const exportAllData = async (selection) => {
   const all = await apiFetch(`${API}/export`);
   const sel = selection || { profile: true, profiles: true, bills: true, clients: true, products: true, expenses: true, purchases: true, recurring: true, receipts: true, termsTemplates: true, meta: true, localStorage: true };
 
-  const data = { exportedAt: new Date().toISOString(), version: '1.4.0', __freegstbill_backup: true };
+  const data = { exportedAt: new Date().toISOString(), version: '2.0.0', __freegstbill_backup: true };
   if (sel.profile)        data.profile = all.profile;
   if (sel.profiles)       data.profiles = all.profiles;
   if (sel.bills)          data.bills = all.bills;
@@ -292,14 +321,12 @@ export const exportAllData = async (selection) => {
   if (sel.recurring)      data.recurring = all.recurring;
   if (sel.receipts)       data.receipts = all.receipts;
   if (sel.purchases)      data.purchases = all.purchases;
-  if (sel.meta)           data.meta = all.meta; // includes regionMode, enabledModules, etc. on server
+  if (sel.meta)           data.meta = all.meta;
   if (sel.localStorage)   data.localStorage = collectLocalStorage();
 
   return JSON.stringify(data, null, 2);
 };
 
-// Inspect a backup file without committing — returns counts so the UI can show
-// what's in it before the user picks what to restore.
 export const inspectBackup = (jsonString) => {
   let data;
   try { data = JSON.parse(jsonString); }
@@ -326,13 +353,11 @@ export const inspectBackup = (jsonString) => {
   };
 };
 
-// Selective import. `selection` is the same shape as for exportAllData.
 export const importData = async (jsonString, selection) => {
   const inspected = typeof jsonString === 'string' ? inspectBackup(jsonString) : { raw: jsonString };
   const data = inspected.raw;
   const sel = selection || { profile: true, profiles: true, bills: true, clients: true, products: true, expenses: true, purchases: true, recurring: true, receipts: true, termsTemplates: true, meta: true, localStorage: true };
 
-  // Build a filtered payload — never touch collections the user didn't tick.
   const payload = {};
   if (sel.profile && data.profile)               payload.profile = data.profile;
   if (sel.profiles && data.profiles)             payload.profiles = data.profiles;
@@ -347,8 +372,6 @@ export const importData = async (jsonString, selection) => {
   if (sel.meta && data.meta)                     payload.meta = data.meta;
 
   const result = await apiFetch(`${API}/import`, { method: 'POST', body: JSON.stringify(payload) });
-
   if (sel.localStorage && data.localStorage) restoreLocalStorage(data.localStorage);
-
   return result;
 };

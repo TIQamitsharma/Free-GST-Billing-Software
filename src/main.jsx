@@ -2,21 +2,18 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App.jsx'
+import { AuthProvider } from './contexts/AuthContext.jsx'
 import './index.css'
 
-// Register service worker with auto-update
 const updateSW = registerSW({
-  onNeedRefresh() {
-    // Auto-update when new content is available
-    updateSW(true)
-  },
-  onOfflineReady() {
-    console.log('Free GST Billing Software is ready to work offline')
-  },
+  onNeedRefresh() { updateSW(true) },
+  onOfflineReady() { console.log('GST Billing is ready to work offline') },
 })
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </StrictMode>,
 )
