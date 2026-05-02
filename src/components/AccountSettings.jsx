@@ -356,7 +356,7 @@ function PlanTab({ isPro, usage, refreshProfile }) {
             Unlimited invoices every month, plus direct GST Portal API filing integration.
           </p>
           <a
-            href="mailto:Contact@dicecodes.com?subject=GST Billing Pro Upgrade"
+            href="mailto:contact@technocratiq.com?subject=GST Billing Pro Upgrade"
             className="btn btn-primary"
             style={{ width: '100%', display: 'flex', justifyContent: 'center', textDecoration: 'none' }}
           >

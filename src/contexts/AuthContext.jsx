@@ -51,7 +51,15 @@ export function AuthProvider({ children }) {
       password,
       options: { data: { display_name: displayName } },
     });
-    return { data, error };
+    if (error) return { data, error };
+
+    // Auto-sign-in immediately after signup (no email confirmation required)
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) {
+      // Email confirmation may be required — return original signup success so UI can show message
+      return { data, error: null, needsConfirmation: true };
+    }
+    return { data: signInData, error: null, needsConfirmation: false };
   };
 
   const signIn = async (email, password) => {

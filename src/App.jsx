@@ -18,6 +18,7 @@ import PurchaseBills from './components/PurchaseBills';
 import UserGuideView from './components/UserGuideView';
 import WelcomeGuide from './components/WelcomeGuide';
 import AccountSettings from './components/AccountSettings';
+import LandingPage from './components/LandingPage';
 import ToastContainer from './components/Toast';
 
 function AppShell() {
@@ -273,7 +274,7 @@ function AppShell() {
           </div>
           <div>
             <h2 className="sidebar-title">GST Billing</h2>
-            <p className="sidebar-subtitle">by DiceCodes</p>
+            <p className="sidebar-subtitle">by Technocratiq</p>
           </div>
         </div>
 
@@ -477,6 +478,7 @@ function AppShell() {
 
 function App() {
   const { user, loading } = useAuth();
+  const [showAuth, setShowAuth] = useState(false);
 
   if (loading) {
     return (
@@ -489,7 +491,10 @@ function App() {
     );
   }
 
-  if (!user) return <AuthRouter />;
+  if (!user) {
+    if (showAuth) return <AuthRouter />;
+    return <LandingPage onGetStarted={() => setShowAuth(true)} />;
+  }
 
   return <AppShell />;
 }

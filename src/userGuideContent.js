@@ -220,6 +220,6 @@ export const GUIDE_CONTENT = [
   { type: 'h2', text: '17. Need help?' },
   { type: 'ul', items: [
     'GitHub issues: github.com/IamRamgarhia/Free-GST-Billing-Software/issues',
-    'Email DiceCodes: contact@dicecodes.com',
+    'Email Technocratiq: contact@technocratiq.com',
   ]},
 ];

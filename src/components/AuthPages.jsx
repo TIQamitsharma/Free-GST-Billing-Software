@@ -12,7 +12,7 @@ function AuthLayout({ children, title, subtitle }) {
           </div>
           <div>
             <h1 className="auth-brand-name">GST Billing</h1>
-            <p className="auth-brand-sub">by DiceCodes</p>
+            <p className="auth-brand-sub">by Technocratiq</p>
           </div>
         </div>
         <h2 className="auth-title">{title}</h2>
@@ -114,13 +114,14 @@ export function SignupPage({ onShowLogin }) {
       return;
     }
     setLoading(true);
-    const { error } = await signUp(email.trim(), password, displayName.trim());
+    const { error, needsConfirmation } = await signUp(email.trim(), password, displayName.trim());
     setLoading(false);
     if (error) {
       setError(error.message);
-    } else {
+    } else if (needsConfirmation) {
       setSuccess(true);
     }
+    // If no error and no confirmation needed, auth state change fires automatically
   };
 
   if (success) {
