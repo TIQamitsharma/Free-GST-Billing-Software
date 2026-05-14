@@ -81,8 +81,10 @@ export default function SettingsView({ onSaved }) {
     e.preventDefault();
     try {
       setSaving(true);
-      await saveProfile(profile);
-      if (onSaved) onSaved(profile);
+      const res = await saveProfile(profile);
+      const saved = res?.id ? { ...profile, id: res.id } : profile;
+      setProfile(saved);
+      if (onSaved) onSaved(saved);
       toast('Profile saved!', 'success');
     } catch { toast('Failed to save profile', 'error'); }
     finally { setSaving(false); }
@@ -284,10 +286,11 @@ export default function SettingsView({ onSaved }) {
       await saveBusinessProfile({ ...profile, id: existing?.id || undefined });
     }
     const loaded = { ...bp };
-    delete loaded.id;
     setProfile(loaded);
-    await saveProfile(loaded);
-    if (onSaved) onSaved(loaded);
+    const res = await saveProfile(loaded);
+    const saved = res?.id ? { ...loaded, id: res.id } : loaded;
+    setProfile(saved);
+    if (onSaved) onSaved(saved);
     toast(`Switched to ${bp.businessName}`, 'success');
   };
 

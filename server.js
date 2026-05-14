@@ -110,10 +110,16 @@ async function checkInvoiceLimit(req, res, next) {
   next();
 }
 
-// Increment monthly invoice usage count (uses admin for reliability)
-async function incrementUsage(userId) {
+// Increment monthly invoice usage count
+async function incrementUsage(userId, token) {
   const yearMonth = new Date().toISOString().slice(0, 7);
-  const db = supabaseAdmin;
+  // Use a user-scoped client so RLS allows the write when no service role key is set
+  const db = SUPABASE_SERVICE_ROLE_KEY
+    ? supabaseAdmin
+    : createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
 
   const { data: existing } = await db
     .from('usage_tracking')
@@ -166,7 +172,7 @@ app.post('/api/bills', requireAuth, checkInvoiceLimit, async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
 
-  if (req.isNewBill) await incrementUsage(req.userId);
+  if (req.isNewBill) await incrementUsage(req.userId, req._token);
 
   res.json({ success: true });
 });
@@ -221,12 +227,28 @@ app.post('/api/profile', requireAuth, async (req, res) => {
     .eq('user_id', req.userId);
 
   const dbProfile = mapProfileToDb(req.body, req.userId, true);
-  const { error } = await db
-    .from('business_profiles')
-    .upsert(dbProfile, { onConflict: 'id' });
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true });
+  let savedId = dbProfile.id;
+  if (savedId) {
+    // Existing profile — update by id
+    const { error } = await db
+      .from('business_profiles')
+      .update({ ...dbProfile })
+      .eq('id', savedId)
+      .eq('user_id', req.userId);
+    if (error) return res.status(500).json({ error: error.message });
+  } else {
+    // New profile — insert and return generated id
+    const { data, error } = await db
+      .from('business_profiles')
+      .insert(dbProfile)
+      .select('id')
+      .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    savedId = data?.id;
+  }
+
+  res.json({ success: true, id: savedId });
 });
 
 // ============================================================
@@ -244,15 +266,28 @@ app.get('/api/profiles', requireAuth, async (req, res) => {
 });
 
 app.post('/api/profiles', requireAuth, async (req, res) => {
+  const db = getDb(req);
   const dbProfile = mapProfileToDb(req.body, req.userId, false);
-  const { data, error } = await getDb(req)
-    .from('business_profiles')
-    .upsert(dbProfile, { onConflict: 'id' })
-    .select('id')
-    .maybeSingle();
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true, id: data?.id || dbProfile.id });
+  let savedId = dbProfile.id;
+  if (savedId) {
+    const { error } = await db
+      .from('business_profiles')
+      .update({ ...dbProfile })
+      .eq('id', savedId)
+      .eq('user_id', req.userId);
+    if (error) return res.status(500).json({ error: error.message });
+  } else {
+    const { data, error } = await db
+      .from('business_profiles')
+      .insert(dbProfile)
+      .select('id')
+      .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    savedId = data?.id;
+  }
+
+  res.json({ success: true, id: savedId });
 });
 
 app.delete('/api/profiles/:id', requireAuth, async (req, res) => {
