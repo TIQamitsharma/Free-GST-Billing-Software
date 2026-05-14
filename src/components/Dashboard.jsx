@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { FileText, Trash2, Plus, IndianRupee, Receipt, CreditCard as Edit3, TrendingUp, Search, Copy, X, CircleCheck as CheckCircle, Clock, TriangleAlert as AlertTriangle, MessageCircle, Mail, StickyNote, Send, Package } from 'lucide-react';
+import { FileText, Trash2, Plus, IndianRupee, Receipt, CreditCard as Edit3, TrendingUp, Search, Copy, X, CircleCheck as CheckCircle, Clock, TriangleAlert as AlertTriangle, MessageCircle, Mail, StickyNote, Send, Package, Database } from 'lucide-react';
 import { getAllBills, deleteBill, saveBill, getAllProducts, saveProduct, getProfile, getAllClients } from '../store';
 import { formatCurrency, INVOICE_TYPES } from '../utils';
 import { toast } from './Toast';
+import SampleDataSeeder from './SampleDataSeeder';
 
 const STATUS_CONFIG = {
   unpaid: { label: 'Unpaid', icon: Clock, color: '#f59e0b', bg: '#fffbeb' },
@@ -25,6 +26,7 @@ function getFYOptions() {
 export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert }) {
   const [bills, setBills] = useState([]);
   const [filtered, setFiltered] = useState([]);
+  const [showSeeder, setShowSeeder] = useState(false);
   const [stats, setStats] = useState({ byCurrency: {}, count: 0 });
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -222,8 +224,16 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert }) {
           <h1 className="page-title">Dashboard</h1>
           <p className="page-subtitle">Overview of your invoices</p>
         </div>
-        <button className="btn btn-primary" onClick={onNew}><Plus size={18} /> New Invoice</button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {bills.length === 0 && (
+            <button className="btn btn-secondary" onClick={() => setShowSeeder(true)} title="Load sample data to explore features">
+              <Database size={16} /> Sample Data
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={onNew}><Plus size={18} /> New Invoice</button>
+        </div>
       </div>
+      {showSeeder && <SampleDataSeeder onDone={() => { setShowSeeder(false); loadBills(); }} />}
 
       {overdueBills.length > 0 && (
         <div className="overdue-banner" onClick={() => { setStatusFilter('overdue'); }}
@@ -388,7 +398,12 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert }) {
           <div className="empty-state">
             <FileText size={48} />
             <p>{bills.length === 0 ? 'No invoices yet.' : 'No invoices match your filters.'}</p>
-            {bills.length === 0 && <button className="btn btn-primary" onClick={onNew}><Plus size={18} /> Create Invoice</button>}
+            {bills.length === 0 && (
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                <button className="btn btn-secondary" onClick={() => setShowSeeder(true)}><Database size={16} /> Load Sample Data</button>
+                <button className="btn btn-primary" onClick={onNew}><Plus size={18} /> Create Invoice</button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="table-scroll">
