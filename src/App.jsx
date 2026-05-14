@@ -34,15 +34,12 @@ function AppShell() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('freegstbill_theme') === 'dark');
   const [showWelcome, setShowWelcome] = useState(false);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
-  const [serverDown, setServerDown] = useState(false);
-  const [serverStatus, setServerStatus] = useState('checking');
   const [allProfiles, setAllProfiles] = useState([]);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [usage, setUsage] = useState(null);
   const deferredPrompt = useRef(null);
-  const retryTimer = useRef(null);
   const profileLoaded = useRef(false);
   const profileMenuRef = useRef(null);
   const accountMenuRef = useRef(null);
@@ -52,65 +49,26 @@ function AppShell() {
   const updateBannerVisible = updateInfo?.updateAvailable
     && localStorage.getItem('freegstbill_dismissedUpdate') !== updateInfo.latest;
 
-  useEffect(() => {
-    let cancelled = false;
-    const check = async () => {
-      try {
-        const res = await fetch('/api/check-update');
-        const data = await res.json();
-        if (!cancelled) setUpdateInfo(data);
-      } catch { /* offline */ }
-    };
-    const initial = setTimeout(check, 5000);
-    const interval = setInterval(check, 6 * 60 * 60 * 1000);
-    return () => { cancelled = true; clearTimeout(initial); clearInterval(interval); };
-  }, []);
-
   // Load usage for plan indicator in sidebar
   useEffect(() => {
-    if (serverStatus === 'online') {
-      getUsage().then(setUsage).catch(() => {});
-    }
-  }, [serverStatus]);
+    getUsage().then(setUsage).catch(() => {});
+  }, []);
 
   const dismissUpdate = () => {
     if (updateInfo?.latest) localStorage.setItem('freegstbill_dismissedUpdate', updateInfo.latest);
     setShowUpdateModal(false);
   };
 
+  // Load profile on mount (direct Supabase — no server needed)
   useEffect(() => {
-    let cancelled = false;
-    const checkServer = async () => {
-      try {
-        // Use /api/health which doesn't require auth
-        const res = await fetch('/api/health', { signal: AbortSignal.timeout(3000) });
-        if (res.ok) {
-          if (cancelled) return;
-          setServerDown(false);
-          setServerStatus('online');
-          if (!profileLoaded.current) {
-            profileLoaded.current = true;
-            try {
-              const p = await getProfile();
-              setProfile(p);
-              if (!p.businessName && !localStorage.getItem('freegstbill_onboarded')) {
-                setShowWelcome(true);
-              }
-            } catch { /* auth not ready yet */ }
-          }
-          return;
-        }
-        throw new Error('not ok');
-      } catch {
-        if (!cancelled) {
-          setServerDown(true);
-          setServerStatus('offline');
-        }
+    if (profileLoaded.current) return;
+    profileLoaded.current = true;
+    getProfile().then(p => {
+      setProfile(p);
+      if (!p?.businessName && !localStorage.getItem('freegstbill_onboarded')) {
+        setShowWelcome(true);
       }
-    };
-    checkServer();
-    retryTimer.current = setInterval(checkServer, 5000);
-    return () => { cancelled = true; if (retryTimer.current) clearInterval(retryTimer.current); };
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -139,10 +97,8 @@ function AppShell() {
   }, [darkMode]);
 
   useEffect(() => {
-    if (serverStatus === 'online') {
-      getAllProfiles().then(setAllProfiles).catch(() => {});
-    }
-  }, [serverStatus]);
+    getAllProfiles().then(setAllProfiles).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!showProfileMenu) return;
@@ -164,10 +120,9 @@ function AppShell() {
 
   const handleSwitchProfile = async (bp) => {
     setShowProfileMenu(false);
-    const loaded = { ...bp };
-    delete loaded.id;
-    await saveProfile(loaded);
-    setProfile(loaded);
+    const res = await saveProfile(bp);
+    const saved = res?.id ? { ...bp, id: res.id } : bp;
+    setProfile(saved);
   };
 
   const handleNewInvoice = () => {
@@ -235,22 +190,6 @@ function AppShell() {
     { id: 'filing', icon: BookOpen, label: 'GST Returns', module: 'gstReturns' },
     { id: 'guide', icon: HelpCircle, label: 'User Guide', module: 'dashboard' },
   ].filter(item => showIfModule(item.module));
-
-  if (serverDown) {
-    return (
-      <div className="server-down-overlay">
-        <div className="server-down-modal">
-          <FileText size={48} color="#3b82f6" />
-          <h2>Connecting to server...</h2>
-          <p>The billing server is starting up. Please wait a moment.</p>
-          <div className="server-down-waiting">
-            <div className="server-down-spinner" />
-            <span>Connecting... this page will refresh automatically.</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (showWelcome) {
     return (
@@ -397,9 +336,9 @@ function AppShell() {
               )}
             </div>
 
-            <div className={`server-status server-status-${serverStatus}`}>
+            <div className="server-status server-status-online">
               <span className="server-status-dot" />
-              {serverStatus === 'online' ? 'App Ready' : serverStatus === 'offline' ? 'Connecting...' : 'Connecting...'}
+              App Ready
             </div>
           </div>
         </nav>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Trash2, Plus, IndianRupee, Receipt, Edit3, TrendingUp, Search, Copy, X, CheckCircle, Clock, AlertTriangle, MessageCircle, Mail, StickyNote, Send, Package } from 'lucide-react';
+import { FileText, Trash2, Plus, IndianRupee, Receipt, CreditCard as Edit3, TrendingUp, Search, Copy, X, CircleCheck as CheckCircle, Clock, TriangleAlert as AlertTriangle, MessageCircle, Mail, StickyNote, Send, Package } from 'lucide-react';
 import { getAllBills, deleteBill, saveBill, getAllProducts, saveProduct, getProfile, getAllClients } from '../store';
 import { formatCurrency, INVOICE_TYPES } from '../utils';
 import { toast } from './Toast';
@@ -120,7 +120,7 @@ export default function Dashboard({ onNew, onEdit, onDuplicate, onConvert }) {
         const prefix = { 'tax-invoice': 'INV', 'proforma': 'PRO', 'credit-note': 'CN', 'bill-of-supply': 'BOS', 'delivery-challan': 'DC' }[bill.invoiceType || 'tax-invoice'] || 'INV';
         const pdfName = `${prefix}_${(bill.invoiceNumber || '').replace(/\//g, '-')}.pdf`;
         const clientName = bill.clientName || bill.data?.client?.name || 'General';
-        fetch('/api/trash-pdf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: pdfName, clientName }) }).catch(err => console.warn('Could not trash PDF:', err));
+        // PDF file cleanup not applicable in cloud mode
 
         toast('Invoice deleted & stock restored', 'success');
         loadBills();

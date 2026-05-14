@@ -798,7 +798,7 @@ export default function InvoiceGenerator({ onBack, profile: profileProp, editing
       const monthName = invoiceDate.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
       const clientName = client?.name || 'General';
       const params = new URLSearchParams({ name: fileName, client: clientName, month: monthName });
-      fetch(`/api/save-pdf?${params}`, { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: pdfBlob }).catch(() => {});
+      // PDF auto-save to server not applicable in cloud mode
 
       toast(`Invoice downloaded & saved to Saved Invoices/${clientName}/`, 'success');
       uploadToGoogleDrive(pdfBlob, fileName);

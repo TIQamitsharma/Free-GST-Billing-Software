@@ -854,18 +854,21 @@ export default function SettingsView({ onSaved }) {
           <button type="button" className="btn btn-secondary" disabled={checkingUpdate} onClick={async () => {
             setCheckingUpdate(true);
             try {
-              const res = await fetch('/api/check-update');
-              const data = await res.json();
+              const res = await fetch('https://api.github.com/repos/IamRamgarhia/Free-GST-Billing-Software/releases/latest');
+              if (!res.ok) throw new Error('GitHub API error');
+              const release = await res.json();
+              const latest = release.tag_name?.replace(/^v/, '') || null;
+              const current = '1.4.3';
+              const updateAvailable = latest && latest !== current;
+              const data = { current, latest, updateAvailable, releaseUrl: release.html_url, releaseNotes: release.body, releasePublishedAt: release.published_at };
               setUpdateInfo(data);
-              if (data.updateAvailable) {
-                toast(`Update available: v${data.latest}`, 'info');
-              } else if (data.error) {
-                toast('Could not check for updates. Check internet connection.', 'warning');
+              if (updateAvailable) {
+                toast(`Update available: v${latest}`, 'info');
               } else {
                 toast('You are on the latest version!', 'success');
               }
             } catch {
-              toast('Could not check for updates.', 'error');
+              toast('Could not check for updates. Check internet connection.', 'warning');
             }
             setCheckingUpdate(false);
           }}>

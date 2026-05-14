@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, FileText, BarChart3, Shield, ChevronRight, ChevronLeft, Check, ArrowRight, Image, PenTool } from 'lucide-react';
+import { Building2, FileText, ChartBar as BarChart3, Shield, ChevronRight, ChevronLeft, Check, ArrowRight, Image, PenTool } from 'lucide-react';
 import { saveProfile, setRegionMode } from '../store';
 import { getStatesForCountry, getCountryConfig, detectCountryFromBrowser } from '../utils';
 import { toast } from './Toast';
@@ -102,7 +102,7 @@ export default function WelcomeGuide({ onComplete }) {
                   { title: 'Create Invoices', desc: 'Tax Invoice, Proforma, Credit Note, Bill of Supply, Delivery Challan' },
                   { title: 'Auto GST Calculation', desc: 'CGST/SGST for same state, IGST for different state — automatic' },
                   { title: 'GST Filing Ready', desc: 'GSTR-1, GSTR-3B, HSN reports auto-generated. Download CSVs for portal.' },
-                  { title: '100% Private', desc: 'All data stored locally as files. No cloud, no signup, no tracking.' },
+                  { title: 'Cloud Synced', desc: 'Data saved securely to your account. Access from any device, any time.' },
                 ].map((item, i) => (
                   <div key={i} style={{ padding: '1rem', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
                     <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.25rem', color: 'var(--text-primary)' }}>{item.title}</div>
@@ -297,7 +297,7 @@ export default function WelcomeGuide({ onComplete }) {
 
               <div style={{ padding: '1rem', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  All your data is stored locally in the <code style={{ background: 'var(--border-color)', padding: '0.1rem 0.3rem', borderRadius: '3px' }}>data/</code> folder on this computer. Nothing is sent to any server. You can export a full backup anytime from Settings.
+                  Your data is saved securely to your account and synced in real time. You can export a full backup anytime from Settings.
                 </div>
               </div>
             </div>
